@@ -1,5 +1,5 @@
-import { AppState } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { AppState, Platform } from 'react-native';
+import * as NativeNotifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import NetInfo, { NetInfoSubscription } from '@react-native-community/netinfo';
 
@@ -11,6 +11,8 @@ import { asyncForEach } from '@huds0n/utilities';
 
 import { DEFAULT_NOTIFICATION_CATEGORIES } from './defaults';
 import * as Types from './types';
+
+const Notifications = Platform.OS !== 'web' ? NativeNotifications : undefined;
 
 export class NotificationStateClass extends SharedState<Types.NotificationStateType> {
   private _ToastComponent: any;
@@ -62,7 +64,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
 
   private async _handleBadge() {
     this.addListener('badge', ({ badge: newBadge }) => {
-      Notifications.setBadgeCountAsync(newBadge);
+      Notifications?.setBadgeCountAsync(newBadge);
     });
 
     AppState.addEventListener('change', (nextAppState) => {
@@ -75,8 +77,10 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   private async _initializeBadge() {
-    const initialBadge = await Notifications.getBadgeCountAsync();
-    this.setState({ badge: initialBadge });
+    if (Notifications) {
+      const initialBadge = await Notifications.getBadgeCountAsync();
+      this.setState({ badge: initialBadge });
+    }
   }
 
   setBadge(value: number) {
@@ -107,19 +111,21 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
       notificationCategories: notificationCategoriesWithDefaults,
     });
 
-    await asyncForEach(
-      notificationCategoriesWithDefaults,
-      async (notification) => {
-        await Notifications.setNotificationCategoryAsync(
-          notification.identifier,
-          notification.actions,
-          notification.options,
-        );
-      },
-      false,
-    );
+    if (Notifications) {
+      await asyncForEach(
+        notificationCategoriesWithDefaults,
+        async (notification) => {
+          await Notifications.setNotificationCategoryAsync(
+            notification.identifier,
+            notification.actions,
+            notification.options,
+          );
+        },
+        false,
+      );
 
-    await Notifications.getNotificationCategoriesAsync();
+      await Notifications.getNotificationCategoriesAsync();
+    }
   }
 
   private _categoryToButtons(
@@ -160,9 +166,11 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
       allowAnnouncements: true,
     };
 
-    await Notifications.requestPermissionsAsync({
-      ios: iosPermissions || DEFAULT_NOTIFICATION_PERMISSIONS,
-    });
+    if (Notifications) {
+      await Notifications.requestPermissionsAsync({
+        ios: iosPermissions || DEFAULT_NOTIFICATION_PERMISSIONS,
+      });
+    }
 
     this._handlePermissionsStatus();
 
@@ -174,14 +182,16 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   private async _handlePermissionsStatus() {
-    const settings = await Notifications.getPermissionsAsync();
+    if (Notifications) {
+      const settings = await Notifications.getPermissionsAsync();
 
-    this.setState({
-      permissionsGranted:
-        settings.granted ||
-        settings.ios?.status ===
-          Notifications.IosAuthorizationStatus.PROVISIONAL,
-    });
+      this.setState({
+        permissionsGranted:
+          settings.granted ||
+          settings.ios?.status ===
+            Notifications.IosAuthorizationStatus.PROVISIONAL,
+      });
+    }
   }
 
   // Push Tokens
@@ -198,10 +208,12 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
       }
 
       try {
-        const expoPushToken = await Notifications.getExpoPushTokenAsync();
-        const newPushToken = expoPushToken.data.substr(18, 22);
+        if (Notifications) {
+          const expoPushToken = await Notifications.getExpoPushTokenAsync();
+          const newPushToken = expoPushToken.data.substr(18, 22);
 
-        this.setState({ pushToken: newPushToken });
+          this.setState({ pushToken: newPushToken });
+        }
         this.save();
 
         removeNetworkListener?.();
@@ -210,7 +222,8 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
           code: 'EXPO_PUSH_TOKEN_ERROR',
           message: 'Unable to get push token',
           severity: 'LOW',
-        }).log();
+          handled: true,
+        });
       }
     };
 
@@ -251,24 +264,29 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   private async _updateScheduledNotifications() {
-    this.setState({
-      scheduledNotifications: (await Notifications.getAllScheduledNotificationsAsync()) as Types.Notification[],
-    });
+    if (Notifications) {
+      this.setState({
+        scheduledNotifications:
+          (await Notifications.getAllScheduledNotificationsAsync()) as Types.Notification[],
+      });
+    }
   }
 
   async scheduleNotification(
-    notification: Notifications.NotificationRequestInput,
+    notification: NativeNotifications.NotificationRequestInput,
   ) {
-    await Notifications.scheduleNotificationAsync({
-      ...notification,
-      content: {
-        ...notification.content,
-        data: {
-          ...notification.content.data,
-          triggerJSON: JSON.stringify(notification.trigger),
+    if (Notifications) {
+      await Notifications.scheduleNotificationAsync({
+        ...notification,
+        content: {
+          ...notification.content,
+          data: {
+            ...notification.content.data,
+            triggerJSON: JSON.stringify(notification.trigger),
+          },
         },
-      },
-    });
+      });
+    }
     await this._updateScheduledNotifications();
   }
 
@@ -277,95 +295,105 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   ) {
     const { scheduledNotifications } = this.state;
 
-    const promises: Promise<any>[] = [];
-    scheduledNotifications
-      .filter(filterFn)
-      .filter((notification) => !!notification.identifier)
-      .forEach((notification) =>
-        promises.push(
-          Notifications.cancelScheduledNotificationAsync(
-            notification.identifier,
+    if (Notifications) {
+      const promises: Promise<any>[] = [];
+      scheduledNotifications
+        .filter(filterFn)
+        .filter((notification) => !!notification.identifier)
+        .forEach((notification) =>
+          promises.push(
+            Notifications.cancelScheduledNotificationAsync(
+              notification.identifier,
+            ),
           ),
-        ),
-      );
+        );
 
-    await Promise.all(promises);
+      await Promise.all(promises);
+    }
+
     await this._updateScheduledNotifications();
   }
 
   private _listenForNotifications() {
-    Notifications.addNotificationReceivedListener((received) => {
-      const notification = received.request as Types.Notification;
+    if (Notifications) {
+      Notifications.addNotificationReceivedListener((received) => {
+        const notification = received.request as Types.Notification;
 
-      if (this._receivedNotifications.has(received.request.identifier)) {
-        return;
-      }
-
-      this._receivedNotifications.add(received.request.identifier);
-
-      const badgeUpdate = received.request.content.badge;
-
-      this.setState({
-        lastNotification: notification,
-        ...(badgeUpdate !== undefined && { badge: badgeUpdate || 0 }),
-      });
-
-      const {
-        content: {
-          title,
-          body,
-          data: { messageProps },
-          categoryIdentifier,
-        },
-      } = notification;
-
-      this._ToastComponent.display({
-        title,
-        message: body || undefined,
-        ...messageProps,
-        ...(categoryIdentifier && {
-          actions: this._categoryToButtons(categoryIdentifier, notification),
-        }),
-        data: { notification },
-      });
-
-      this._updateScheduledNotifications();
-    });
-
-    Notifications.addNotificationResponseReceivedListener((response) => {
-      const { actionIdentifier, userText } = response;
-      const notification = response.notification.request as Types.Notification;
-
-      const {
-        content: {
-          categoryIdentifier,
-          data: { messageProps },
-          title,
-          body,
-        },
-      } = notification;
-
-      if (
-        categoryIdentifier &&
-        actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
-      ) {
-        const actions = this._categoryToButtons(
-          categoryIdentifier,
-          notification,
-        );
-
-        if (actions) {
-          this._ToastComponent.display({
-            title,
-            message: body || undefined,
-            ...messageProps,
-            actions,
-            data: { notification },
-          });
+        if (this._receivedNotifications.has(received.request.identifier)) {
+          return;
         }
-      } else {
-        this.state.responseHandler?.(actionIdentifier, notification, userText);
-      }
-    });
+
+        this._receivedNotifications.add(received.request.identifier);
+
+        const badgeUpdate = received.request.content.badge;
+
+        this.setState({
+          lastNotification: notification,
+          ...(badgeUpdate !== undefined && { badge: badgeUpdate || 0 }),
+        });
+
+        const {
+          content: {
+            title,
+            body,
+            data: { messageProps },
+            categoryIdentifier,
+          },
+        } = notification;
+
+        this._ToastComponent.display({
+          title,
+          message: body || undefined,
+          ...messageProps,
+          ...(categoryIdentifier && {
+            actions: this._categoryToButtons(categoryIdentifier, notification),
+          }),
+          data: { notification },
+        });
+
+        this._updateScheduledNotifications();
+      });
+
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const { actionIdentifier, userText } = response;
+        const notification = response.notification
+          .request as Types.Notification;
+
+        const {
+          content: {
+            categoryIdentifier,
+            data: { messageProps },
+            title,
+            body,
+          },
+        } = notification;
+
+        if (
+          categoryIdentifier &&
+          actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
+        ) {
+          const actions = this._categoryToButtons(
+            categoryIdentifier,
+            notification,
+          );
+
+          if (actions) {
+            this._ToastComponent.display({
+              title,
+              message: body || undefined,
+              ...messageProps,
+              actions,
+              data: { notification },
+            });
+          }
+        } else {
+          this.state.responseHandler?.(
+            actionIdentifier,
+            notification,
+            userText,
+          );
+        }
+      });
+    }
   }
 }

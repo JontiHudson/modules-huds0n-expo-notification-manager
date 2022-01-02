@@ -1,7 +1,7 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet, Text } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, FlatList, View } from '@huds0n/components';
+import { Button, FlatList } from '@huds0n/components';
 import {
   createNotificationManager,
   NotificationTypes,
