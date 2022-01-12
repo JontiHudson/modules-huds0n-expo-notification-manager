@@ -1,8 +1,8 @@
-import { NotificationStateClass } from './NotificationStateClass';
-import * as NotificationTypes from './types';
+import { NotificationStateClass } from "./NotificationStateClass";
+import type { Types } from "./types";
 
-export function createNotificationManager(options?: NotificationTypes.Options) {
+export function createNotificationManager(options?: Types.Options) {
   return new NotificationStateClass(options);
 }
 
-export { NotificationTypes };
+export type { Types as NotificationTypes } from "./types";

@@ -1,22 +1,23 @@
-import { AppState, Platform } from 'react-native';
-import * as NativeNotifications from 'expo-notifications';
-import Constants from 'expo-constants';
-import NetInfo, { NetInfoSubscription } from '@react-native-community/netinfo';
+import { AppState, Platform } from "react-native";
+import * as NativeNotifications from "expo-notifications";
+import Constants from "expo-constants";
+import NetInfo, { NetInfoSubscription } from "@react-native-community/netinfo";
 
-import Huds0nError from '@huds0n/error';
-import { SharedState } from '@huds0n/shared-state';
-import { createStoreRN } from '@huds0n/shared-state-store-rn';
-import { ToastTypes, Toast } from '@huds0n/toast';
-import { asyncForEach } from '@huds0n/utilities';
+import Huds0nError from "@huds0n/error";
+import { SharedState } from "@huds0n/shared-state";
+import { SharedStateStore } from "@huds0n/shared-state-store-rn";
+import { ToastTypes, Toast } from "@huds0n/toast";
+import { asyncForEach } from "@huds0n/utilities";
 
-import { DEFAULT_NOTIFICATION_CATEGORIES } from './defaults';
-import * as Types from './types';
+import { DEFAULT_NOTIFICATION_CATEGORIES } from "./defaults";
+import type { Types } from "./types";
 
-const Notifications = Platform.OS !== 'web' ? NativeNotifications : undefined;
+const Notifications = Platform.OS !== "web" ? NativeNotifications : undefined;
 
 export class NotificationStateClass extends SharedState<Types.NotificationStateType> {
   private _ToastComponent: any;
   private _receivedNotifications = new Set<string>();
+  private _store!: SharedStateStore<Types.NotificationStateType>;
 
   constructor(options: Types.Options = {}) {
     super({
@@ -42,7 +43,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   private async _initialize(options: Types.Options) {
-    await this._initializeNotificationStorage();
+    this._initializeNotificationStorage();
 
     this._handleBadge();
     this._handleCategories(options);
@@ -51,24 +52,22 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
     this._handleScheduledNotification();
   }
 
-  private async _initializeNotificationStorage() {
-    await this.initializeStorage(
-      createStoreRN({
-        excludeKeys: ['badge', 'permissionsGranted', 'notificationCategories'],
-        storeName: '__NotificationState',
-      }),
-    );
+  private _initializeNotificationStorage() {
+    this._store = new SharedStateStore(this, {
+      storeName: "__NotificationState",
+      excludeKeys: ["badge", "permissionsGranted", "notificationCategories"],
+    });
   }
 
   // Badge
 
   private async _handleBadge() {
-    this.addListener('badge', ({ badge: newBadge }) => {
+    this.addListener(({ badge: newBadge }) => {
       Notifications?.setBadgeCountAsync(newBadge);
-    });
+    }, "badge");
 
-    AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+    AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
         this._initializeBadge();
       }
     });
@@ -92,7 +91,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   useBadge() {
-    return this.useProp('badge')[0];
+    return this.useProp("badge")[0];
   }
 
   // Categories
@@ -118,10 +117,10 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
           await Notifications.setNotificationCategoryAsync(
             notification.identifier,
             notification.actions,
-            notification.options,
+            notification.options
           );
         },
-        false,
+        false
       );
 
       await Notifications.getNotificationCategoriesAsync();
@@ -130,12 +129,12 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
 
   private _categoryToButtons(
     identifier: string,
-    notification: Types.Notification,
+    notification: Types.Notification
   ): ToastTypes.Action[] | undefined {
     const { responseHandler, notificationCategories } = this.state;
 
     const category = notificationCategories.find(
-      (category) => category.identifier === identifier,
+      (category) => category.identifier === identifier
     );
 
     if (!category) {
@@ -152,7 +151,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
         : {
             label: buttonTitle,
             onPress: () => responseHandler?.(identifier, notification),
-          },
+          }
     );
   }
 
@@ -174,8 +173,8 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
 
     this._handlePermissionsStatus();
 
-    AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+    AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
         this._handlePermissionsStatus();
       }
     });
@@ -214,14 +213,14 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
 
           this.setState({ pushToken: newPushToken });
         }
-        this.save();
+        this._store.save();
 
         removeNetworkListener?.();
       } catch (error) {
         Huds0nError.transform(error, {
-          code: 'EXPO_PUSH_TOKEN_ERROR',
-          message: 'Unable to get push token',
-          severity: 'LOW',
+          code: "EXPO_PUSH_TOKEN_ERROR",
+          message: "Unable to get push token",
+          severity: "LOW",
           handled: true,
         });
       }
@@ -240,12 +239,12 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
     if (this.pushToken) {
       callback(this.pushToken);
     } else {
-      const removeListener = this.addListener('pushToken', ({ pushToken }) => {
+      const removeListener = this.addListener(({ pushToken }) => {
         if (pushToken) {
           callback(pushToken);
           removeListener();
         }
-      });
+      }, "pushToken");
     }
   }
 
@@ -256,8 +255,8 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
 
     this._listenForNotifications();
 
-    AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+    AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
         this._updateScheduledNotifications();
       }
     });
@@ -273,7 +272,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   async scheduleNotification(
-    notification: NativeNotifications.NotificationRequestInput,
+    notification: NativeNotifications.NotificationRequestInput
   ) {
     if (Notifications) {
       await Notifications.scheduleNotificationAsync({
@@ -291,7 +290,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
   }
 
   async cancelNotifications(
-    filterFn: (notification: Types.Notification) => boolean = () => true,
+    filterFn: (notification: Types.Notification) => boolean = () => true
   ) {
     const { scheduledNotifications } = this.state;
 
@@ -303,9 +302,9 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
         .forEach((notification) =>
           promises.push(
             Notifications.cancelScheduledNotificationAsync(
-              notification.identifier,
-            ),
-          ),
+              notification.identifier
+            )
+          )
         );
 
       await Promise.all(promises);
@@ -374,7 +373,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
         ) {
           const actions = this._categoryToButtons(
             categoryIdentifier,
-            notification,
+            notification
           );
 
           if (actions) {
@@ -390,7 +389,7 @@ export class NotificationStateClass extends SharedState<Types.NotificationStateT
           this.state.responseHandler?.(
             actionIdentifier,
             notification,
-            userText,
+            userText
           );
         }
       });

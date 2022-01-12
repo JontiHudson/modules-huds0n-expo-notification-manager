@@ -1,19 +1,19 @@
-import React from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React from "react";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 
-import { Button, FlatList } from '@huds0n/components';
+import { Button, FlatList, ComponentTypes } from "@huds0n/components";
 import {
   createNotificationManager,
   NotificationTypes,
-} from '@huds0n/expo-notification-manager';
-import { TextInput, useTextInput, validators } from '@huds0n/inputs';
-import { Toast } from '@huds0n/toast';
+} from "@huds0n/expo-notification-manager";
+import { TextInput, useTextInput, validators } from "@huds0n/inputs";
+import { Toast } from "@huds0n/toast";
 
 const NotificationManager = createNotificationManager();
 
 export default function NotificationManagerPlayground() {
   const [scheduledNotifications] = NotificationManager.useProp(
-    'scheduledNotifications',
+    "scheduledNotifications"
   );
 
   return (
@@ -30,9 +30,7 @@ export default function NotificationManagerPlayground() {
   );
 }
 
-function renderItem({
-  item,
-}: FlatList.ListRenderItemInfo<NotificationTypes.Notification>) {
+function renderItem({ item }: any) {
   const {
     content: {
       title,
@@ -46,8 +44,8 @@ function renderItem({
   return (
     <View>
       <Text>{title}</Text>
-      {body && <Text style={{ textAlign: 'center' }}>{body}</Text>}
-      <Text>{date.toLocaleDateString() + ' ' + date.toLocaleTimeString()}</Text>
+      {body && <Text style={{ textAlign: "center" }}>{body}</Text>}
+      <Text>{date.toLocaleDateString() + " " + date.toLocaleTimeString()}</Text>
     </View>
   );
 }
@@ -66,11 +64,11 @@ function ListHeaderComponent() {
         <TextInput
           {...badgeInput}
           keyboardType="numeric"
-          validation={validators.number({
+          validator={validators.number({
             maxDecimals: 0,
             greaterThanOrEqual: 0,
           })}
-          style={{ textAlign: 'center', color: 'blue' }}
+          style={{ textAlign: "center", color: "blue" }}
         />
       </Button>
     </View>
@@ -79,7 +77,7 @@ function ListHeaderComponent() {
 
 const styles = StyleSheet.create({
   safeAreaView: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
     margin: 20,
   },
