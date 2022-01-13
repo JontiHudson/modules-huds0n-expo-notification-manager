@@ -10,12 +10,12 @@
     "publish": "node scripts/publish.js"
   },
   "dependencies": {
-    "@huds0n/components": "1.6.0-beta44",
-    "@huds0n/expo-notification-manager": "1.6.0-beta44",
-    "@huds0n/inputs": "1.6.0-beta44",
-    "@huds0n/toast": "1.6.0-beta44",
+    "@huds0n/components": "1.6.0-beta45",
+    "@huds0n/expo-notification-manager": "1.6.0-beta45",
+    "@huds0n/inputs": "1.6.0-beta45",
+    "@huds0n/toast": "1.6.0-beta45",
     "expo": "^44.0.3"
   },
   "private": true,
-  "version": "1.6.0-beta44"
+  "version": "1.6.0-beta45"
 }
